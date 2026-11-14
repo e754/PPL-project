@@ -1,12 +1,13 @@
 word,frequency
 the,28
-a,17
 of,16
 be,15
+a,12
 archive,11
 and,9
 in,7
 to,7
+as,6
 what,5
 memory,4
 by,4
@@ -28,6 +29,7 @@ collection,2
 power,2
 record,2
 only,2
+long,2
 but,2
 's,2
 public,2
@@ -37,6 +39,7 @@ release,2
 can,2
 ongoing,2
 digital,2
+term,2
 often,1
 imagine,1
 neutral,1
@@ -93,7 +96,7 @@ lay,1
 governance,1
 rather,1
 represent,1
-colonise,1
+colonised,1
 result,1
 documentary,1
 skew,1
@@ -110,7 +113,6 @@ court,1
 deposition,1
 there,1
 subaltern,1
-long,1
 grapple,1
 asymmetry,1
 read,1
@@ -142,7 +144,8 @@ paper,1
 united,1
 kingdom,1
 under,1
-thirty-year,1
+thirty,1
+year,1
 rule,1
 understanding,1
 event,1
@@ -158,7 +161,7 @@ these,1
 dynamic,1
 online,1
 access,1
-democratises,1
+democratise,1
 research,1
 allow,1
 anyone,1
@@ -178,15 +181,13 @@ reflect,1
 category,1
 cataloguer,1
 search,1
-algorithms,1
+algorithm,1
 privilege,1
 certain,1
-term,1
 sheer,1
 scale,1
 material,1
 obscure,1
-as,1
 much,1
 it,1
 reveal,1
@@ -197,7 +198,6 @@ raise,1
 urgent,1
 question,1
 about,1
-long-term,1
 preservation,1
 not,1
 thing,1
@@ -215,5 +215,5 @@ accept,1
 always,1
 some,1
 measure,1
-curated,1
+curate,1
 artefact,1
