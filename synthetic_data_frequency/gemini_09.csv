@@ -313,13 +313,10 @@ theorem,1
 formalise,1
 rational,1
 agent,1
-p(h)$,1
 light,1
 new,1
-p(e|h)$,1
 yield,1
 posterior,1
-p(h|e)$,1
 encase,1
 silent,1
 vault,1
@@ -791,7 +788,6 @@ separate,1
 modality,1
 target,1
 antipsychotic,1
-ext{d}_2,1
 antagonist,1
 noise,1
 dampen,1
@@ -813,8 +809,6 @@ trial,1
 treatment,1
 resistant,1
 depression,1
-ext{-ht}_{2,1
-ext{a}}$,1
 agonism,1
 relax,1
 entrenched,1
