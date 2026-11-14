@@ -20,14 +20,14 @@
 ;; All three are lemma counts, so student and AI essays are compared like
 ;; for like.
 ;;
-;; Features: only function words ("the", "of", "which", ...). They are
-;; frequent, topic-independent, and say more about *style* than content, so a
-;; student writing about economics and then about history still looks like
-;; themselves.
+;; Features: the 100 most frequent words across the students' training essays
+;; (`top-n`). Every essay, student or AI, is compared on that same list; all
+;; other words are ignored. Only training essays pick the list, so held-out
+;; and AI essays don't influence which words are used.
 ;;
-;; All probabilities are exact fractions. Multiplying thousands of word
-;; probabilities would underflow a floating-point number to 0, but Roulette's
-;; engine handles exact fractions, so every word of every essay is used.
+;; Likelihoods are computed as exact fractions, so multiplying thousands of
+;; word probabilities never underflows; every occurrence of a top-100 word in
+;; every essay is used.
 
 (require racket/string
          racket/list
@@ -35,10 +35,12 @@
          racket/format
          racket/match)
 
-(provide function-words
-         students-with-essays
+(provide students-with-essays
+         top-words
+         restrict
          read-freq-table
-         student-model
+         top-n
+         smoothing
          held-out-essay
          synthetic-essays
          build-model
@@ -68,27 +70,33 @@
 
 (define (canonicalize w) (hash-ref canonical w w))
 
-;; Classic stylometry function words, as lemmas ("be" covers is/are/was/...,
-;; "have" covers has/had, "they" covers their/them).
-(define function-words
-  '("a" "about" "after" "all" "also" "and" "any" "as" "at" "be" "but" "by"
-    "can" "could" "do" "even" "for" "from" "have" "however" "if" "in" "into"
-    "it" "may" "more" "must" "no" "not" "of" "on" "one" "only" "or" "other"
-    "should" "so" "some" "such" "than" "that" "the" "then" "there"
-    "therefore" "these" "they" "this" "those" "thus" "to" "upon" "we" "what"
-    "when" "where" "which" "while" "who" "will" "with" "would"))
-
-(define function-word-set (for/hash ([w (in-list function-words)]) (values w #t)))
-
-;; Read a "word,frequency" CSV into a hash of function word -> count.
+;; Read a "word,frequency" CSV into a hash of word -> count.
 (define (read-freq-table path)
   (for*/fold ([h (hash)])
              ([line (in-list (rest (file->lines path)))]
               [m (in-value (regexp-match #px"^(.*),([0-9]+)\\s*$" line))]
               #:when m
-              [w (in-value (canonicalize (string-downcase (string-trim (cadr m) "\""))))]
-              #:when (hash-ref function-word-set w #f))
+              [w (in-value (canonicalize (string-downcase (string-trim (cadr m) "\""))))])
     (hash-update h w (lambda (c) (+ c (string->number (caddr m)))) 0)))
+
+;; How many of the most frequent words to use as features.
+(define top-n (make-parameter 100))
+
+;; The `n` most frequent words across `tables` (ties broken alphabetically).
+(define (top-words tables [n (top-n)])
+  (define totals
+    (for*/fold ([h (hash)]) ([t (in-list tables)] [(w c) (in-hash t)])
+      (hash-update h w (lambda (x) (+ x c)) 0)))
+  (define ranked
+    (sort (hash->list totals)
+          (lambda (a b) (or (> (cdr a) (cdr b))
+                            (and (= (cdr a) (cdr b)) (string<? (car a) (car b)))))))
+  (map car (take ranked (min n (length ranked)))))
+
+;; Keep only the words in `words` (a list) from a count table.
+(define (restrict table words)
+  (for*/hash ([w (in-list words)] [c (in-value (hash-ref table w 0))] #:when (> c 0))
+    (values w c)))
 
 (define (csv-path dir id) (build-path dir (string-append id ".csv")))
 
@@ -116,18 +124,26 @@
     (cons (substring f 0 (- (string-length f) 4))
           (read-freq-table (build-path synthetic-dir f)))))
 
-;; An "abstract writer": exact probability of each function word, built from
-;; one or more count tables, with add-one smoothing so unseen words are
-;; unlikely but not impossible.
-(define (build-model tables)
+;; How many made-up occurrences each word gets before counting (add-alpha
+;; smoothing). 1 is "add-one". With only the top 100 words, every student has
+;; many real occurrences of each, so add-one barely changes anything.
+(define smoothing (make-parameter 1))
+
+;; An "abstract writer": exact probability of every word, built from one or
+;; more count tables, smoothed over a vocabulary of `vocab` words so unseen
+;; words are unlikely but not impossible:
+;;   p(w) = (count(w) + alpha) / (total + alpha * vocab)
+;; Stored as (counts alpha . denominator) rather than one entry per word.
+(define (build-model tables vocab)
   (define counts
     (for*/fold ([h (hash)]) ([t (in-list tables)] [(w c) (in-hash t)])
       (hash-update h w (lambda (x) (+ x c)) 0)))
-  (define total (+ (apply + (hash-values counts)) (length function-words)))
-  (for/hash ([w (in-list function-words)])
-    (values w (/ (+ 1 (hash-ref counts w 0)) total))))
+  (define alpha (smoothing))
+  (list* counts alpha (+ (apply + (hash-values counts)) (* alpha vocab))))
 
-(define (student-model id) (build-model (list (read-freq-table (csv-path train-dir id)))))
+(define (word-prob model w)
+  (match-define (list* counts alpha denom) model)
+  (/ (+ alpha (hash-ref counts w 0)) denom))
 
 ;; ---------------------------------------------------------------------------
 ;; the probabilistic model
@@ -145,21 +161,35 @@
       [(list (cons _ v)) v]
       [(cons (cons a v) rest) (if (equal? author a) v (loop rest))])))
 
-;; Observe that the essay contains word `w` exactly `n` times.
-;;
-;; The literal version is: for each of the n occurrences,
-;;   (observe! (equal? (make-categorical (author-model author)) w))
-;; which multiplies author a's weight by p_a(w) each time. We do the same
-;; thing with one soft observation per word type: (observe! (flip p))
-;; multiplies the weight by p, so we use p = p_a(w)^n.
-(define (observe-word-count! author models w n)
-  (observe! (flip (lookup author (for/list ([m (in-list models)])
-                                   (cons (car m) (expt (hash-ref (cdr m) w) n)))))))
+;; Exact probability that writer `model` produces `essay` (word -> count):
+;; the product of p(w) over every word occurrence.
+(define (essay-likelihood model essay)
+  (for/product ([(w n) (in-hash essay)])
+    (expt (word-prob model w) n)))
 
-;; `essay` is a count table: function word -> number of occurrences.
+;; Observe the whole essay.
+;;
+;; The literal version is: for every word occurrence w in the essay,
+;;   (observe! (equal? (make-categorical (author-model author)) w))
+;; which multiplies author a's weight by p_a(w). (observe! (flip p))
+;; multiplies the weight by p, so one soft observation with p = the product
+;; of all those p_a(w) does the same update in one step.
+;;
+;; Each likelihood is computed exactly, then divided (exactly) by the largest
+;; one. That constant is the same for every author and cancels when Roulette
+;; normalizes the posterior. Only then is each ratio turned into a decimal:
+;; the best author is exactly 1.0 and the rest are between 0 and 1, so
+;; nothing underflows that matters, and the engine works with small floats
+;; instead of fractions with thousands of digits (much faster). A ratio below
+;; ~1e-308 becomes 0.0, which only rounds an essentially-zero posterior to 0.
 (define (observe-essay! author models essay)
-  (for ([(w n) (in-hash essay)])
-    (observe-word-count! author models w n)))
+  (define liks (for/list ([m (in-list models)])
+                 (cons (car m) (essay-likelihood (cdr m) essay))))
+  (define best (apply max (map cdr liks)))
+  (observe! (flip (lookup author (for/list ([l (in-list liks)])
+                                   (cons (car l) (exact->inexact (/ (cdr l) best))))))))
+
+;; `essay` is a count table: word -> number of occurrences.
 
 ;; ATTRIBUTION: who, among these students, wrote `essay`?
 ;; `models` is a list of (student-id . model). Returns a pmf over student ids.
@@ -198,14 +228,20 @@
 (define (fmt p) (real->decimal-string p 3))
 
 (define (run-experiment #:students [n 30] #:min-essays [min-essays 5])
+  ;; Read every table once, pick the top words from the training essays, and
+  ;; cut every table down to those words.
   (define ids (take (students-with-essays min-essays) n))
-  (define models (for/list ([id (in-list ids)]) (cons id (student-model id))))
-  (define held-out (for/hash ([id (in-list ids)]) (values id (held-out-essay id))))
-  (define background
-    (build-model (for/list ([id (in-list ids)]) (read-freq-table (csv-path train-dir id)))))
-  (define ai (synthetic-essays))
+  (define raw-train (for/hash ([id (in-list ids)]) (values id (read-freq-table (csv-path train-dir id)))))
+  (define words (top-words (hash-values raw-train)))
+  (define vocab (length words))
+  (define train (for/hash ([(id t) (in-hash raw-train)]) (values id (restrict t words))))
+  (define held-out (for/hash ([id (in-list ids)]) (values id (restrict (held-out-essay id) words))))
+  (define ai (for/list ([e (in-list (synthetic-essays))]) (cons (car e) (restrict (cdr e) words))))
+  (define models (for/list ([id (in-list ids)]) (cons id (build-model (list (hash-ref train id)) vocab))))
+  (define background (build-model (hash-values train) vocab))
 
-  (printf "~a students, ~a function words, ~a AI essays\n\n" n (length function-words) (length ai))
+  (printf "~a students, top ~a words, smoothing ~a, ~a AI essays\n\n"
+          n vocab (smoothing) (length ai))
   (printf "student  top guess  P(top)  P(true)  P(own)  P(student impostor)  AI essay     P(AI)\n")
   (define rows
     (for/list ([id (in-list ids)]
@@ -236,13 +272,26 @@
 ;;   racket authorship.rkt synthetic_data_frequency/claude_01.csv 0001
 (define (check-file path id #:min-essays [min-essays 5])
   (define ids (take (students-with-essays min-essays) 30))
-  (define background
-    (build-model (for/list ([i (in-list ids)]) (read-freq-table (csv-path train-dir i)))))
-  (define d (verify (read-freq-table path) (student-model id) background))
+  (define raw-train (for/list ([i (in-list ids)]) (read-freq-table (csv-path train-dir i))))
+  (define words (top-words raw-train))
+  (define vocab (length words))
+  (define train (for/list ([t (in-list raw-train)]) (restrict t words)))
+  (define own (restrict (read-freq-table (csv-path train-dir id)) words))
+  (define essay (restrict (read-freq-table path) words))
+  (define d (verify essay (build-model (list own) vocab) (build-model train vocab)))
   (printf "P(student ~a wrote ~a) = ~a\n" id path (real->decimal-string (d #t) 4)))
 
+;; racket authorship.rkt [--top N] [--smoothing A] [essay-frequency.csv student-id]
 (module+ main
-  (match (current-command-line-arguments)
-    [(vector) (run-experiment #:students 30)]
-    [(vector path id) (check-file path id)]
-    [_ (displayln "usage: racket authorship.rkt [essay-frequency.csv student-id]")]))
+  (define usage
+    "usage: racket authorship.rkt [--top N] [--smoothing A] [essay-frequency.csv student-id]")
+  (let loop ([args (vector->list (current-command-line-arguments))])
+    (match args
+      [(list* "--top" n more) (top-n (string->number n)) (loop more)]
+      ;; read "0.01" as the exact fraction 1/100, so probabilities stay exact
+      [(list* "--smoothing" a more)
+       (smoothing (string->number a 10 'number-or-false 'decimal-as-exact))
+       (loop more)]
+      [(list) (run-experiment #:students 30)]
+      [(list path id) (check-file path id)]
+      [_ (displayln usage)])))
