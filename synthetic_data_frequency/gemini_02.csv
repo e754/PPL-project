@@ -7,8 +7,8 @@ in,38
 to,34
 's,31
 as,29
-be,27
-a,25
+be,28
+a,26
 by,21
 london,20
 public,18
@@ -90,6 +90,7 @@ discourse,3
 it,3
 speculation,3
 sociability,3
+revolution,3
 st,3
 around,3
 covent,3
@@ -126,6 +127,7 @@ parliamentary,3
 network,3
 company,3
 news,3
+politeness,3
 financial,3
 enlightenment,3
 scientific,3
@@ -149,13 +151,13 @@ sober,2
 contest,2
 site,2
 reshape,2
-revolution,2
 proliferation,2
 first,2
 place,2
 cluster,2
 street,2
 unlike,2
+patron,2
 only,2
 dish,2
 pamphlet,2
@@ -255,7 +257,6 @@ seat,2
 etiquette,2
 side,2
 hand,2
-politeness,2
 religious,2
 seventeenth,2
 national,2
@@ -375,7 +376,7 @@ sens,1
 nominal,1
 earn,1
 sobriquet,1
-universities'—patrons,1
+university,1
 gain,1
 access,1
 but,1
@@ -542,7 +543,6 @@ time,1
 capital,1
 participate,1
 discourage,1
-patron,1
 deem,1
 disruptive,1
 insufficiently,1
@@ -691,7 +691,7 @@ prominent,1
 gentleman,1
 white,1
 brooks,1
-boodle's,1
+boodle,1
 membership,1
 fee,1
 balloting,1
@@ -773,7 +773,6 @@ hack,1
 same,1
 pass,1
 proximity,1
-politeness'—a,1
 concept,1
 extensively,1
 theorise,1
@@ -814,7 +813,7 @@ rivalry,1
 nowhere,1
 evident,1
 emergence,1
-revolution'—marked,1
+mark,1
 founding,1
 bank,1
 creation,1

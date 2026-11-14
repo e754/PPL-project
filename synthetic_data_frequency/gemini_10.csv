@@ -2,8 +2,8 @@ word,frequency
 the,49
 of,47
 quantum,40
-and,39
-a,38
+and,40
+a,39
 to,29
 qubit,27
 physical,20
@@ -13,7 +13,7 @@ gate,16
 in,15
 fault,15
 logical,15
-code,14
+code,15
 that,13
 be,13
 classical,11
@@ -67,6 +67,7 @@ universal,4
 execute,4
 operation,4
 decoherence,4
+qec,4
 topological,4
 no,4
 theorem,4
@@ -106,7 +107,6 @@ coherence,3
 power,3
 through,3
 three,3
-qec,3
 all,3
 measure,3
 it,3
@@ -151,6 +151,7 @@ trade,2
 off,2
 platform,2
 so,2
+must,2
 spin,2
 superconducte,2
 transmon,2
@@ -302,7 +303,6 @@ essay,1
 examine,1
 analyse,1
 how,1
-qec)—and,1
 specifically,1
 circumvent,1
 evaluate,1
@@ -312,7 +312,6 @@ understand,1
 why,1
 powerful,1
 fragile,1
-must,1
 contrast,1
 whereas,1
 transistor,1
@@ -432,7 +431,6 @@ track,1
 software,1
 myriad,1
 past,1
-code'—a,1
 emerge,1
 gold,1
 standard,1
@@ -681,7 +679,7 @@ application,1
 specific,1
 integrated,1
 circuits,1
-asics)—must,1
+asic,1
 keep,1
 pace,1
 cycle,1

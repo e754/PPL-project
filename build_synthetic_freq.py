@@ -23,9 +23,13 @@ ARTIFACTS = {"-lrb-", "-rrb-", "lrb", "rrb"}
 
 # Matches LaTeX commands, math-mode delimiters, and inline math fragments
 LATEX_RE = re.compile(r'\\[a-zA-Z]+|\$.*?\$|\^|_|\{|\}')
+# Em-dash and en-dash used without spaces (fuse adjacent words into one token)
+EMDASH_RE = re.compile(r'[—–]')
 
 def strip_latex(text: str) -> str:
-    return LATEX_RE.sub(' ', text)
+    text = LATEX_RE.sub(' ', text)
+    text = EMDASH_RE.sub(' ', text)
+    return text
 
 def is_valid(t: str) -> bool:
     t = t.lower()

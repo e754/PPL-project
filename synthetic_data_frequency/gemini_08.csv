@@ -2,7 +2,7 @@ word,frequency
 the,72
 and,59
 of,59
-a,36
+a,38
 to,33
 in,30
 be,27
@@ -26,6 +26,7 @@ human,8
 this,8
 mary,8
 with,8
+problem,7
 conscious,7
 subjective,7
 fundamental,7
@@ -37,7 +38,6 @@ not,7
 fact,7
 know,7
 new,7
-problem,6
 scientific,6
 person,6
 what,6
@@ -48,6 +48,7 @@ knowledge,6
 remain,6
 do,6
 non,6
+concept,6
 cognitive,5
 neural,5
 objective,5
@@ -60,6 +61,7 @@ panpsychism,5
 argue,5
 because,5
 away,5
+dualism,5
 metaphysical,5
 their,5
 within,5
@@ -68,7 +70,6 @@ if,5
 epistemic,5
 she,5
 for,5
-concept,5
 philosophical,4
 process,4
 while,4
@@ -85,11 +86,11 @@ intrinsic,4
 property,4
 yet,4
 substance,4
-dualism,4
 science,4
 articulate,4
 world,4
 they,4
+even,4
 about,4
 upon,4
 then,4
@@ -105,7 +106,6 @@ conceptual,3
 third,3
 neurophysiological,3
 philosopher,3
-quale,3
 hard,3
 something,3
 ripe,3
@@ -126,7 +126,6 @@ view,3
 leave,3
 very,3
 explain,3
-even,3
 possess,3
 into,3
 room,3
@@ -164,7 +163,9 @@ perception,2
 persist,2
 description,2
 term,2
+quale,2
 chalmers,2
+ask,2
 inner,2
 life,2
 any,2
@@ -202,6 +203,7 @@ independent,2
 however,2
 when,2
 same,2
+strategy,2
 reveal,2
 neuroscientist,2
 complete,2
@@ -221,6 +223,7 @@ associate,2
 her,2
 time,2
 seem,2
+qualia,2
 false,2
 sophisticated,2
 response,2
@@ -292,7 +295,6 @@ activity,1
 character,1
 coin,1
 puzzle,1
-ask,1
 cerebral,1
 cortex,1
 give,1
@@ -373,7 +375,6 @@ toward,1
 observer,1
 attempt,1
 apply,1
-strategy,1
 method,1
 break,1
 down,1
@@ -439,7 +440,7 @@ thought,1
 experiment,1
 primarily,1
 presentation,1
-strategy'—developed,1
+develop,1
 brian,1
 loar,1
 katalin,1
@@ -448,7 +449,6 @@ papineau,1
 concede,1
 track,1
 instead,1
-concept'—a,1
 direct,1
 recognitional,1
 think,1
@@ -615,8 +615,6 @@ icon,1
 binary,1
 code,1
 reframe,1
-problem'—asking,1
-qualia,1
 keep,1
 firmly,1
 neurocomputational,1
@@ -638,7 +636,7 @@ middle,1
 path,1
 lie,1
 pair,1
-humility'—a,1
+humility,1
 position,1
 varied,1
 colin,1
@@ -665,7 +663,6 @@ translate,1
 persistent,1
 dissonance,1
 perspectival,1
-dualism'—even,1
 conclusion,1
 endure,1
 vitality,1
@@ -694,7 +691,7 @@ inquiry,1
 furthermore,1
 technological,1
 stake,1
-resolving,1
+resolve,1
 least,1
 clarify,1
 metaphysics,1
