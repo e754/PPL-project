@@ -25,15 +25,17 @@
 ;; other words are ignored. Only training essays pick the list, so held-out
 ;; and AI essays don't influence which words are used.
 ;;
-;; Likelihoods are computed as exact fractions, so multiplying thousands of
-;; word probabilities never underflows; every occurrence of a top-100 word in
-;; every essay is used.
+;; Every occurrence of a top-100 word is observed with
+;;   (observe! (equal? (make-categorical ...) w))
+;; and Roulette does all of the inference. Probabilities are exact fractions,
+;; so multiplying thousands of them never underflows.
 
 (require racket/string
          racket/list
          racket/file
          racket/format
-         racket/match)
+         racket/match
+         racket/sequence)
 
 (provide students-with-essays
          top-words
@@ -149,10 +151,6 @@
 ;; the probabilistic model
 ;; ---------------------------------------------------------------------------
 
-;; (uniform-choice '(x y z)) is x, y, or z, each with probability 1/3.
-(define (uniform-choice xs)
-  (make-categorical (for/list ([x (in-list xs)]) (cons x (/ 1 (length xs))))))
-
 ;; Given a (symbolic) author and a table author -> value, return that author's
 ;; value. This is the "look up the key" step; Roulette tracks every branch.
 (define (lookup author table)
@@ -161,54 +159,83 @@
       [(list (cons _ v)) v]
       [(cons (cons a v) rest) (if (equal? author a) v (loop rest))])))
 
-;; Exact probability that writer `model` produces `essay` (word -> count):
-;; the product of p(w) over every word occurrence.
-(define (essay-likelihood model essay)
-  (for/product ([(w n) (in-hash essay)])
-    (expt (word-prob model w) n)))
-
-;; Observe the whole essay.
+;; The abstract student: given the (unknown) author, draw a word using that
+;; author's frequencies. This is the "letter-dist" of the Caesar example.
 ;;
-;; The literal version is: for every word occurrence w in the essay,
-;;   (observe! (equal? (make-categorical (author-model author)) w))
-;; which multiplies author a's weight by p_a(w). (observe! (flip p))
-;; multiplies the weight by p, so one soft observation with p = the product
-;; of all those p_a(w) does the same update in one step.
-;;
-;; Each likelihood is computed exactly, then divided (exactly) by the largest
-;; one. That constant is the same for every author and cancels when Roulette
-;; normalizes the posterior. Only then is each ratio turned into a decimal:
-;; the best author is exactly 1.0 and the rest are between 0 and 1, so
-;; nothing underflows that matters, and the engine works with small floats
-;; instead of fractions with thousands of digits (much faster). A ratio below
-;; ~1e-308 becomes 0.0, which only rounds an essentially-zero posterior to 0.
-(define (observe-essay! author models essay)
-  (define liks (for/list ([m (in-list models)])
-                 (cons (car m) (essay-likelihood (cdr m) essay))))
-  (define best (apply max (map cdr liks)))
-  (observe! (flip (lookup author (for/list ([l (in-list liks)])
-                                   (cons (car l) (exact->inexact (/ (cdr l) best))))))))
+;; The draw is only ever compared with the observed word `w`, so each
+;; author's categorical has two outcomes, `w` and 'other, where 'other
+;; stands for "any of the other words". P(draw = w) is exactly the same as
+;; with all words listed separately, so the posterior is identical. It
+;; matters for speed: make-categorical builds a tree of flips (~99 for 100
+;; words), and since the author is unknown Roulette builds one per author
+;; for every word, so the full version ran out of memory on a 10-word test.
+;; The two-outcome version is one flip per author.
+(define (word-dist author models w)
+  (lookup author
+          (for/list ([m (in-list models)])
+            (define p (word-prob (cdr m) w))
+            (cons (car m) (make-categorical (list (cons w p) (cons 'other (- 1 p))))))))
 
-;; `essay` is a count table: word -> number of occurrences.
+;; How many words to observe per query (see `infer-author`).
+(define chunk-size (make-parameter 200))
+
+;; Every word occurrence in a count table (word -> count), as a list.
+(define (essay-words essay)
+  (for*/list ([(w n) (in-hash essay)] [_ (in-range n)]) w))
+
+;; Posterior over authors after reading `essay`, starting from `prior`
+;; (a list of (author . probability)). `models` maps each author to a model.
+;;
+;; Each word is observed exactly like a ciphertext letter:
+;;   (observe! (equal? (enc (letter-dist) key) 20))     ; Caesar
+;;   (observe! (equal? (word-dist author models w) w))  ; here
+;; and Roulette does the inference.
+;;
+;; Essays are read in chunks of `chunk-size` words: observe a chunk, take the
+;; posterior, and use it as the prior for the next chunk (sequential Bayesian
+;; updating, the same "learning from data" as the coin example). Observing
+;; a whole long essay in one query makes Roulette's exact fractions grow
+;; without bound; a 12,000-word essay ran the engine out of memory. Between
+;; chunks the posterior is rounded to double precision (~16 digits) and
+;; turned back into an exact fraction, so each chunk starts small.
+;;
+;; With very large fractions the engine's results carry rounding error: on
+;; long essays some authors came back with posteriors like -1e-53. Anything
+;; that small is noise (at least 1e16 times below the leading author), so
+;; authors whose posterior is not positive are dropped and the rest are
+;; renormalized to sum to 1.
+(define (infer-author prior models essay)
+  (define final
+    (for/fold ([prior prior]) ([chunk (in-slice (chunk-size) (essay-words essay))])
+      (clear-cache!)
+      (define d
+        (query
+         (define author (make-categorical prior))
+         (for ([w (in-list chunk)])
+           (observe! (equal? (word-dist author models w) w)))
+         author))
+      (define kept
+        (for/list ([(a p) (in-pmf d)] #:when (positive? p))
+          (cons a (inexact->exact (exact->inexact p)))))
+      (define total (apply + (map cdr kept)))
+      (for/list ([a+p (in-list kept)]) (cons (car a+p) (/ (cdr a+p) total)))))
+  (pmf (for/hash ([a+p (in-list final)]) (values (car a+p) (cdr a+p)))))
 
 ;; ATTRIBUTION: who, among these students, wrote `essay`?
-;; `models` is a list of (student-id . model). Returns a pmf over student ids.
+;; `models` is a list of (student-id . model). Starts from a uniform prior,
+;; like the uniform prior on Caesar keys. Returns a pmf over student ids.
 (define (attribute essay models)
-  (query
-   (define author (uniform-choice (map car models)))
-   (observe-essay! author models essay)
-   author))
+  (infer-author (for/list ([m (in-list models)]) (cons (car m) (/ 1 (length models))))
+                models essay))
 
 ;; VERIFICATION: did `student` write `essay`, or did someone else?
 ;; "Someone else" is modeled by `background`, a model built from many other
 ;; students. `prior` is how likely we think it is, before reading, that the
 ;; student wrote it. Returns a pmf over #t / #f.
 (define (verify essay student-model background #:prior [prior 1/2])
-  (query
-   (define wrote-it (flip prior))
-   (define models (list (cons #t student-model) (cons #f background)))
-   (observe-essay! wrote-it models essay)
-   wrote-it))
+  (infer-author (list (cons #t prior) (cons #f (- 1 prior)))
+                (list (cons #t student-model) (cons #f background))
+                essay))
 
 ;; ---------------------------------------------------------------------------
 ;; experiment (milestone 1 plan)
@@ -257,6 +284,7 @@
       (printf "~a     ~a       ~a   ~a    ~a   ~a                ~a  ~a\n"
               id guess (fmt (d guess)) (fmt (d id)) (fmt own) (fmt fake)
               (~a ai-name #:min-width 11) (fmt ai-p))
+      (flush-output) ; show each row as soon as it's done
       (list (equal? guess id) (> own 1/2) (<= fake 1/2) (<= ai-p 1/2))))
   (define (pct k) (real->decimal-string (* 100.0 (/ (count values (map k rows)) n)) 1))
   (printf "\nattribution accuracy (1 of ~a):          ~a%\n" n (pct first))
